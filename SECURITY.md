@@ -10,9 +10,8 @@ We take security seriously. If you discover a security vulnerability, please fol
 
 Instead, please report them via one of the following methods:
 
-1. **Email**: [Your security email address]
-2. **Private Security Advisory**: Create a private security advisory on GitHub
-3. **Direct Contact**: Reach out to the maintainers directly
+1. **Email**: alex@futurescape.at
+2. **Direct Contact**: Reach out to the maintainers directly
 
 ### What to Include
 
