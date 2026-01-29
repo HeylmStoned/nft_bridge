@@ -149,7 +149,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Apply trigger to lock_events
+-- Apply trigger to lock_events (idempotent: drop first so re-run doesn't fail)
+DROP TRIGGER IF EXISTS update_lock_events_updated_at ON lock_events;
 CREATE TRIGGER update_lock_events_updated_at
   BEFORE UPDATE ON lock_events
   FOR EACH ROW

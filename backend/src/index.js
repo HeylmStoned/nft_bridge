@@ -71,8 +71,12 @@ async function runMigration() {
     await db.query(schema);
     logger.info('✅ Database schema initialized');
   } catch (error) {
-    if (error.message.includes('already exists') || error.code === '42P07') {
-      logger.info('Database schema already exists, skipping migration');
+    if (
+      error.message.includes('already exists') ||
+      error.code === '42P07' ||
+      /trigger.*already exists/i.test(error.message)
+    ) {
+      logger.info('Database schema already exists or trigger present, skipping migration');
     } else {
       logger.error('Migration failed:', error.message);
       throw error;
