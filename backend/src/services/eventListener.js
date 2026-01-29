@@ -32,28 +32,32 @@ export class EventListener {
     this.isRunning = true;
     logger.info(`Starting event listener for ${this.chainName}`);
 
-    // Get last processed block from database
-    this.lastProcessedBlock = await db.getLastProcessedBlock(this.chainName);
-    
-    if (!this.lastProcessedBlock) {
-      // Start from current block if no history
-      this.lastProcessedBlock = await this.provider.getBlockNumber();
-      logger.info(`No history found, starting from block ${this.lastProcessedBlock}`);
+    try {
+      let last = await db.getLastProcessedBlock(this.chainName);
+      last = last != null ? Number(last) : null;
+      this.lastProcessedBlock = last;
+      if (this.lastProcessedBlock == null) {
+        this.lastProcessedBlock = Number(await this.provider.getBlockNumber());
+        logger.info(`No history found, starting from block ${this.lastProcessedBlock}`);
+      }
+      await this.catchUp();
+    } catch (err) {
+      logger.error(`Catch-up failed for ${this.chainName}, starting polling from current block:`, err.message);
+      try {
+        this.lastProcessedBlock = Number(await this.provider.getBlockNumber());
+        await db.updateLastProcessedBlock(this.chainName, this.lastProcessedBlock);
+      } catch (e) {
+        logger.error(`Could not sync ${this.chainName} last block:`, e.message);
+      }
     }
 
-    // Catch up on missed blocks
-    await this.catchUp();
-
-    // Start polling for new blocks (instead of using filters)
     this.startPolling();
-
     logger.info(`Event listener for ${this.chainName} started successfully`);
   }
 
   startPolling() {
-    // Poll every 12 seconds (average block time)
     const pollInterval = this.chainName === 'megaeth' ? 1000 : 12000;
-    
+
     this.pollingInterval = setInterval(async () => {
       if (!this.isRunning) {
         clearInterval(this.pollingInterval);
@@ -62,8 +66,12 @@ export class EventListener {
 
       try {
         const currentBlock = await this.provider.getBlockNumber();
-        if (currentBlock > this.lastProcessedBlock) {
+        const head = Number(currentBlock);
+        const last = Number(this.lastProcessedBlock ?? 0);
+        if (head > last) {
           await this.processBlock(currentBlock);
+        } else if (this.chainName === 'ethereum') {
+          logger.info(`Ethereum: head=${head}, lastProcessed=${last} (no new blocks)`);
         }
       } catch (error) {
         logger.error(`Error polling blocks on ${this.chainName}:`, error);
@@ -125,8 +133,8 @@ export class EventListener {
         await this.handleUnlockEvent(tokenId, recipient, lockHash, event);
       }
 
-      this.lastProcessedBlock = toBlock;
-      await db.updateLastProcessedBlock(this.chainName, toBlock);
+      this.lastProcessedBlock = Number(toBlock);
+      await db.updateLastProcessedBlock(this.chainName, this.lastProcessedBlock);
 
     } catch (error) {
       const isTimeout = error?.code === 30 || /timeout|Request timeout/i.test(error?.message || '');
