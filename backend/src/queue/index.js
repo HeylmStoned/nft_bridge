@@ -81,18 +81,25 @@ export async function startQueueProcessors() {
 }
 
 /**
- * Get queue stats
+ * Get queue stats. Returns empty counts on Redis/queue failure so stats endpoint doesn't 500.
  */
 export async function getQueueStats() {
-  const [proofCounts, rootCounts] = await Promise.all([
-    proofQueue.getJobCounts(),
-    rootQueue.getJobCounts(),
-  ]);
-
-  return {
-    proofGeneration: proofCounts,
-    rootSubmission: rootCounts,
-  };
+  try {
+    const [proofCounts, rootCounts] = await Promise.all([
+      proofQueue.getJobCounts(),
+      rootQueue.getJobCounts(),
+    ]);
+    return {
+      proofGeneration: proofCounts,
+      rootSubmission: rootCounts,
+    };
+  } catch (err) {
+    logger.warn('Queue stats unavailable:', err.message);
+    return {
+      proofGeneration: { waiting: 0, active: 0, completed: 0, failed: 0, delayed: 0, paused: 0 },
+      rootSubmission: { waiting: 0, active: 0, completed: 0, failed: 0, delayed: 0, paused: 0 },
+    };
+  }
 }
 
 /**
